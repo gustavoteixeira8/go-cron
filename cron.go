@@ -116,7 +116,6 @@ func (c *Cron) processCron(cronValue string, config *CronConfig, callback Callba
 			int64(now.Month()),
 			int64(now.Year()),
 		}
-		fmt.Println(now.Second())
 		canRunCallback := false
 
 		for i, timeUnit := range cronSplitted {

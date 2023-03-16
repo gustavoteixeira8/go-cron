@@ -1,9 +1,7 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"runtime"
 	"time"
 
 	cron "github.com/gustavoteixeira8/go-cron"
@@ -11,10 +9,10 @@ import (
 
 func main() {
 	c := cron.New()
-
-	c.AddFunc("* * * * * *", nil, func() error {
+	//          s  m  h  d  m  y
+	c.AddFunc("20 40 08 16 03 2023", nil, func() error {
 		fmt.Printf("Olá mundo 1: %v\n", time.Now())
-		return errors.New("some error")
+		return nil
 	})
 
 	c.AddFunc("* * * * * *", nil, func() error {
@@ -22,12 +20,5 @@ func main() {
 		return nil
 	})
 
-	go c.Start()
-
-	for {
-		fmt.Println()
-		fmt.Println(runtime.NumGoroutine())
-		fmt.Println()
-		time.Sleep(time.Second)
-	}
+	c.Start()
 }

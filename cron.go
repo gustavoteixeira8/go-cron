@@ -116,7 +116,7 @@ func (c *Cron) processCron(cronValue string, config *CronConfig, callback Callba
 			int64(now.Month()),
 			int64(now.Year()),
 		}
-
+		fmt.Println(now.Second())
 		canRunCallback := false
 
 		for i, timeUnit := range cronSplitted {
@@ -156,8 +156,8 @@ func (c *Cron) processCron(cronValue string, config *CronConfig, callback Callba
 			} else if err != nil {
 				log.Printf("Error executing callback: %v\n", err)
 			}
+			executedAlready = true
 		}
-		executedAlready = true
 		time.Sleep(time.Second)
 	}
 }

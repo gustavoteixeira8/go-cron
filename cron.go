@@ -27,6 +27,9 @@ type Cron struct {
 
 /*
 cron.AddFunc adiciona um cron para ser executado
+
+---
+
 Parameters:
 
   - cronValue:

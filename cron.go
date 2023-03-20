@@ -151,24 +151,24 @@ func (c *Cron) processCron(cronValue string, config *CronConfig, callback Callba
 		if canRunCallback && !executedAlready {
 			err := callback()
 
-			if err != nil && config != nil {
+			if err != nil {
 				log.Printf("Error executing callback: %v\n", err)
 
-				time.Sleep(config.RetriesAfter)
-
-				for i := 0; i < config.Retries; i++ {
-					log.Printf("Retrying to execute callback (%d)", i+1)
-
-					err := callback()
-					if err == nil {
-						break
-					}
-
-					log.Printf("Error executing callback: %v\n", err)
+				if config != nil {
 					time.Sleep(config.RetriesAfter)
+
+					for i := 0; i < config.Retries; i++ {
+						log.Printf("Retrying to execute callback (%d)", i+1)
+
+						err := callback()
+						if err == nil {
+							break
+						}
+
+						log.Printf("Error executing callback: %v\n", err)
+						time.Sleep(config.RetriesAfter)
+					}
 				}
-			} else if err != nil {
-				log.Printf("Error executing callback: %v\n", err)
 			}
 
 			executedAlready = true

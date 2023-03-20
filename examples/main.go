@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,10 +10,17 @@ import (
 
 func main() {
 	c := cron.New()
+
+	config := &cron.CronConfig{Retries: 2, RetriesAfter: time.Second}
+
 	//          s  m  h  d  m  y
-	c.AddFunc("* * 07 17 03 2023", nil, func() error {
-		fmt.Printf("Olá mundo 1: %v\n", time.Now())
-		return nil
+	c.AddFunc("10 * * * * *", config, func() error {
+		if time.Now().Second() == 12 {
+			fmt.Printf("Olá mundo 1: %v\n", time.Now())
+			return nil
+		}
+
+		return errors.New("some cron error")
 	})
 
 	// c.AddFunc("* * * * * *", nil, func() error {

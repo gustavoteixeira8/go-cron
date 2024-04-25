@@ -11,7 +11,7 @@ import (
 func main() {
 	c := cron.New()
 
-	config := &cron.CronConfig{Retries: 2, RetriesAfter: time.Second}
+	config := &cron.CronConfig{Retries: 2, RetriesAfter: time.Second, Debug: true}
 
 	//          s  m  h  d  m  y
 	c.AddFunc("10 * * * * *", config, func() error {

@@ -18,6 +18,7 @@ type Callback func() error
 type CronConfig struct {
 	Retries      int
 	RetriesAfter time.Duration
+	Debug        bool
 }
 
 type Cron struct {

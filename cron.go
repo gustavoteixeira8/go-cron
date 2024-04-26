@@ -18,12 +18,14 @@ type Callback func() error
 type CronConfig struct {
 	Retries      int
 	RetriesAfter time.Duration
+	Callback     Callback
+	Close        chan bool
 	Debug        bool
 }
 
 type Cron struct {
-	funcs  map[string]Callback
 	config map[string]*CronConfig
+	wg     sync.WaitGroup
 }
 
 /*
@@ -61,10 +63,7 @@ Parameters:
 
   - callback: função que será executada no momento em que o cronValue for verdadeiro
 */
-func (c *Cron) AddFunc(cronValue string, config *CronConfig, callback Callback) {
-	if c.funcs == nil {
-		c.funcs = map[string]Callback{}
-	}
+func (c *Cron) AddFunc(cronValue string, config *CronConfig) {
 	if c.config == nil {
 		c.config = map[string]*CronConfig{}
 	}
@@ -72,20 +71,15 @@ func (c *Cron) AddFunc(cronValue string, config *CronConfig, callback Callback) 
 	cronValue = fmt.Sprintf("%s %s", cronValue, uuid.NewString())
 
 	c.config[cronValue] = config
-	c.funcs[cronValue] = callback
+
+	c.wg.Add(1)
+	go c.processCron(cronValue, config)
+
 }
 
 // Inicia todos os crons e trava o processo.
-func (c *Cron) Start() {
-	var wg sync.WaitGroup
-
-	for cron, cb := range c.funcs {
-		wg.Add(1)
-		config := c.config[cron]
-		go c.processCron(cron, config, cb)
-	}
-
-	wg.Wait()
+func (c *Cron) Wait() {
+	c.wg.Wait()
 }
 
 func (c *Cron) isToExecEverySecond(cronValue string) bool {
@@ -102,7 +96,7 @@ func (c *Cron) isToExecEverySecond(cronValue string) bool {
 }
 
 // Verifica se o cronValue corresponde a hora atual e executa a callback.
-func (c *Cron) processCron(cronValue string, config *CronConfig, callback Callback) {
+func (c *Cron) processCron(cronValue string, config *CronConfig) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -117,67 +111,77 @@ func (c *Cron) processCron(cronValue string, config *CronConfig, callback Callba
 		return
 	}
 
+	ticker := time.NewTicker(time.Second)
+
 	executedAlready := false
 	isToExecEverySecond := c.isToExecEverySecond(cronValue)
 	for {
-		canRunCallback := false
+		select {
+		case <-ticker.C:
+			{
+				canRunCallback := false
 
-		if !isToExecEverySecond {
-			now := time.Now()
-			timeValues := []int64{
-				int64(now.Second()),
-				int64(now.Minute()),
-				int64(now.Hour()),
-				int64(now.Day()),
-				int64(now.Month()),
-				int64(now.Year()),
-			}
-			for i, timeUnit := range cronSplitted {
-				timeUnitAsInt, err := strconv.ParseInt(timeUnit, 10, 64)
-				if err != nil {
-					continue
-				}
-				if timeUnitAsInt != timeValues[i] {
-					canRunCallback = false
-					executedAlready = false
-					break
-				}
-				canRunCallback = true
-			}
-		} else {
-			canRunCallback = true
-			executedAlready = false
-		}
-
-		if canRunCallback && !executedAlready {
-			err := callback()
-
-			if err != nil {
-				log.Printf("Error executing callback: %v\n", err)
-
-				if config != nil {
-					time.Sleep(config.RetriesAfter)
-
-					for i := 0; i < config.Retries; i++ {
-						log.Printf("Retrying to execute callback (%d)", i+1)
-
-						err := callback()
-						if err == nil {
+				if !isToExecEverySecond {
+					now := time.Now()
+					timeValues := []int64{
+						int64(now.Second()),
+						int64(now.Minute()),
+						int64(now.Hour()),
+						int64(now.Day()),
+						int64(now.Month()),
+						int64(now.Year()),
+					}
+					for i, timeUnit := range cronSplitted {
+						timeUnitAsInt, err := strconv.ParseInt(timeUnit, 10, 64)
+						if err != nil {
+							continue
+						}
+						if timeUnitAsInt != timeValues[i] {
+							canRunCallback = false
+							executedAlready = false
 							break
 						}
-
-						log.Printf("Error executing callback: %v\n", err)
-						time.Sleep(config.RetriesAfter)
+						canRunCallback = true
 					}
+				} else {
+					canRunCallback = true
+					executedAlready = false
 				}
-			}
 
-			executedAlready = true
+				if canRunCallback && !executedAlready {
+					err := config.Callback()
+
+					if err != nil {
+						log.Printf("Error executing callback: %v\n", err)
+
+						if config != nil {
+							time.Sleep(config.RetriesAfter)
+
+							for i := 0; i < config.Retries; i++ {
+								log.Printf("Retrying to execute callback (%d)", i+1)
+
+								err := config.Callback()
+								if err == nil {
+									break
+								}
+
+								log.Printf("Error executing callback: %v\n", err)
+								time.Sleep(config.RetriesAfter)
+							}
+						}
+					}
+
+					executedAlready = true
+				}
+
+			}
+		case <-config.Close:
+			return
 		}
-		time.Sleep(time.Second)
+
 	}
 }
 
 func New() *Cron {
-	return &Cron{funcs: map[string]Callback{}}
+	return &Cron{config: make(map[string]*CronConfig)}
 }

@@ -16,6 +16,7 @@ const _FIXED_CRON_LEN = 6
 type Callback func() error
 
 type CronConfig struct {
+	ID           string
 	Retries      int
 	RetriesAfter time.Duration
 	Callback     Callback
@@ -70,11 +71,21 @@ func (c *Cron) AddFunc(cronValue string, config *CronConfig) {
 
 	cronValue = fmt.Sprintf("%s %s", cronValue, uuid.NewString())
 
-	c.config[cronValue] = config
+	c.config[config.ID] = config
 
 	c.wg.Add(1)
 	go c.processCron(cronValue, config)
 
+}
+
+// Inicia todos os crons e trava o processo.
+func (c *Cron) Close(id string) {
+
+	config := c.config[id]
+
+	config.Close <- true
+
+	c.wg.Done()
 }
 
 // Inicia todos os crons e trava o processo.
